@@ -1,12 +1,11 @@
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, from_binary, Coin, Deps, DepsMut, Uint128, Addr, Binary};
+    use cosmwasm_std::{from_binary, Coin, Uint128, Binary};
 
     use crate::contract::{execute, instantiate, query};
-    use crate::error::ContractError;
-    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ResolveRecordResponse, ProviderResponse, ExecuteAIMsgDetail};
-    use crate::state::{Config, ImageInfo, Provider};
+    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ProviderResponse, ExecuteAIMsgDetail};
+    use crate::state::{Provider};
 
     #[test]
     fn register_and_allow_providers() {
@@ -25,7 +24,7 @@ mod tests {
         let msg = ExecuteMsg::RegisterProvider {
             name: "provider1".to_string(),
             price: Uint128::from(10 as u32),
-            expires: env.block.time.plus_seconds(1800),
+            expires: 1000,
             execution_limit: Uint128::from(2 as u32),
             supported_nfts: vec!["nft_address1".to_string()],
             endpoint: "https://example.com".to_string(),
@@ -91,7 +90,7 @@ mod tests {
         let msg = ExecuteMsg::RegisterProvider {
             name: "provider1".to_string(),
             price: Uint128::from(10 as u32),
-            expires: env.block.time.plus_seconds(1800),
+            expires: 1000,
             execution_limit: Uint128::from(2 as u32),
             supported_nfts: vec!["nft_address1".to_string()],
             endpoint: "https://example.com".to_string(),
@@ -106,7 +105,7 @@ mod tests {
 
         // Execute AI algorithm
         let info = mock_info("human14n3tx8s5ftzhlxvq0w5962v60vd82h30jt9eya", &[Coin {denom: "uheart".to_string(), amount: Uint128::from(10 as u32)}]);
-        let execute_algorithm_msg = ExecuteMsg::ExecuteAI { 
+        let execute_algorithm_msg = ExecuteMsg::ExecuteAlgorithm { 
             msg: ExecuteAIMsgDetail {
                 provider_id: Uint128::from(0 as u32), 
                 nft_addr: "nft_address1".to_string(), 
@@ -117,7 +116,5 @@ mod tests {
 
         let res = execute(deps.as_mut(), env.clone(), info, execute_algorithm_msg).unwrap();
         println!("response: {:?}", res);
-
-
     }
 }
