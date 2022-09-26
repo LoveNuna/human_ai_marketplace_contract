@@ -1,20 +1,20 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "ExecuteMsg",
+  "title": "QueryMsg",
   "oneOf": [
     {
       "type": "object",
       "required": [
-        "allow_provider"
+        "get_provider_by_id"
       ],
       "properties": {
-        "allow_provider": {
+        "get_provider_by_id": {
           "type": "object",
           "required": [
-            "provider_id"
+            "id"
           ],
           "properties": {
-            "provider_id": {
+            "id": {
               "$ref": "#/definitions/Uint128"
             }
           }
@@ -25,42 +25,17 @@
     {
       "type": "object",
       "required": [
-        "register_provider"
+        "get_workload_status"
       ],
       "properties": {
-        "register_provider": {
+        "get_workload_status": {
           "type": "object",
           "required": [
-            "endpoint",
-            "execution_limit",
-            "expires",
-            "name",
-            "price",
-            "supported_nfts"
+            "workload_id"
           ],
           "properties": {
-            "endpoint": {
-              "type": "string"
-            },
-            "execution_limit": {
+            "workload_id": {
               "$ref": "#/definitions/Uint128"
-            },
-            "expires": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            },
-            "name": {
-              "type": "string"
-            },
-            "price": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "supported_nfts": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
             }
           }
         }
@@ -70,23 +45,11 @@
     {
       "type": "object",
       "required": [
-        "execute_algorithm"
+        "get_provider_count"
       ],
       "properties": {
-        "execute_algorithm": {
-          "type": "object",
-          "required": [
-            "msg",
-            "pubkey"
-          ],
-          "properties": {
-            "msg": {
-              "$ref": "#/definitions/ExecuteAIMsgDetail"
-            },
-            "pubkey": {
-              "$ref": "#/definitions/Binary"
-            }
-          }
+        "get_provider_count": {
+          "type": "object"
         }
       },
       "additionalProperties": false
@@ -94,10 +57,10 @@
     {
       "type": "object",
       "required": [
-        "update_workload_status"
+        "get_allowed_workload"
       ],
       "properties": {
-        "update_workload_status": {
+        "get_allowed_workload": {
           "type": "object",
           "required": [
             "pubkey",
@@ -120,25 +83,6 @@
     "Binary": {
       "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
       "type": "string"
-    },
-    "ExecuteAIMsgDetail": {
-      "type": "object",
-      "required": [
-        "nft_addr",
-        "provider_id",
-        "token_id"
-      ],
-      "properties": {
-        "nft_addr": {
-          "type": "string"
-        },
-        "provider_id": {
-          "$ref": "#/definitions/Uint128"
-        },
-        "token_id": {
-          "type": "string"
-        }
-      }
     },
     "Uint128": {
       "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",

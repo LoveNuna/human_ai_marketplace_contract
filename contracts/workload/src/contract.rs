@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, Timestamp, Addr, coin, SubMsg, BankMsg, Empty
+    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,  Addr, coin, SubMsg, BankMsg, Empty
 };
 
 use crate::error::ContractError;
@@ -14,6 +14,7 @@ use bech32::{self, ToBase32, Variant};
 
 // use base64::encode;
 // use cosmwasm_crypto::secp256k1_verify;
+
 
 pub const NATIVE_DENOM: &str = "uheart";
 
@@ -45,7 +46,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::AllowProvider { provider_id } => allow_provider(deps, env, info, provider_id),
         ExecuteMsg::RegisterProvider { name, price, expires, execution_limit, supported_nfts, endpoint } => register_provider(deps, env, info, name, price, expires, execution_limit, supported_nfts, endpoint),
-        ExecuteMsg::ExecuteAI { msg, pubkey} => execute_algorithm(deps, env, info, msg, pubkey),
+        ExecuteMsg::ExecuteAlgorithm { msg, pubkey} => execute_algorithm(deps, env, info, msg, pubkey),
         ExecuteMsg::UpdateWorkloadStatus { workload_id, pubkey } =>  update_workload_status(deps, env, info, workload_id, pubkey),
     }
 }
@@ -71,11 +72,11 @@ pub fn allow_provider(
 
 pub fn register_provider(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     name: String,
     price: Uint128, 
-    expires: Timestamp, 
+    expires: u64, 
     execution_limit: Uint128, 
     supported_nfts: Vec<String>,
     endpoint: String
@@ -93,7 +94,7 @@ pub fn register_provider(
         register: info.sender.to_string(),
         name,
         price,
-        expires,
+        expires: env.block.time.plus_seconds(expires),
         execution_limit,
         supported_nfts: supported_nft_addr,
         execution_count: Uint128::zero(),
@@ -162,6 +163,7 @@ pub fn execute_algorithm(
 
     // Update the provider information
     provider_info.execution_count += Uint128::from(1 as u32);
+    PROVIDER_INFO.save(deps.storage, provider_id.to_string(), &provider_info)?;
 
     // pay creator for the usage
     let mut res = Response::new();

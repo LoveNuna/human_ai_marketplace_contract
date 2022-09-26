@@ -1,4 +1,4 @@
-use cosmwasm_std::{Uint128, Timestamp, Binary};
+use cosmwasm_std::{Uint128, Binary};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -22,8 +22,8 @@ pub struct ExecuteAIMsgDetail {
 pub enum ExecuteMsg {
     // AddWhitelistedRegister { whitelisted_register: String},
     AllowProvider { provider_id: Uint128 },
-    RegisterProvider { name: String, price: Uint128, expires: Timestamp, execution_limit: Uint128, supported_nfts: Vec<String>, endpoint: String },
-    ExecuteAI { 
+    RegisterProvider { name: String, price: Uint128, expires: u64, execution_limit: Uint128, supported_nfts: Vec<String>, endpoint: String },
+    ExecuteAlgorithm { 
         msg: ExecuteAIMsgDetail,
         pubkey: Binary,
     },
