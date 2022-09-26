@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
-use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage};
+use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage, Uint128, Timestamp};
 
 use cw721::{ContractInfoResponse, CustomMsg, Cw721, Expiration};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
@@ -149,4 +149,15 @@ where
 
 pub fn token_owner_idx<T>(d: &TokenInfo<T>) -> Addr {
     d.owner.clone()
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Metadata {
+    pub docker_img_url: String,
+    pub docker_img_tag: String,
+    pub docker_img_entrypoint: String,
+    pub schema_url: String,
+    pub title: String,
+    pub description: String,
+    pub author: String,
 }
