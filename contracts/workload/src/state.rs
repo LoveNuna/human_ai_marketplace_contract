@@ -51,10 +51,11 @@ pub enum WorkloadStatus {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct WorkloadInfo {
     pub provider_id: Uint128,
-    pub executor: Addr,
+    pub executor: String,
     pub time: Timestamp,
     pub status: WorkloadStatus,   // 0: Not running, 1: running, 2: finished
     pub docker_img_url: String,
+    pub caller: String,
 }
 
 // Primary key for providers: (provider_id, register)

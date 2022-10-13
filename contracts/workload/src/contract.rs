@@ -1,20 +1,16 @@
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,  Addr, coin, SubMsg, BankMsg, Empty
+    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,  Addr, coin, SubMsg, BankMsg, Empty, from_binary
 };
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ProviderResponse, WorkloadInfoResponse, ExecuteAIMsgDetail};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ProviderResponse, WorkloadInfoResponse, ExecuteAIMsgDetail, InputMsg};
 use crate::state::{ADMIN, PROVIDER_COUNT, WORKLOAD_INFO, WORKLOAD_COUNT, Provider, WorkloadInfo,  WorkloadStatus, PROVIDER_INFO};
 use cw721_base::QueryMsg as Cw721QueryMsg;
 use cw721_base::Metadata;
 use cw721::{NftInfoResponse};
-use sha2::{Digest};
 use ripemd::{Ripemd160};
 use bech32::{self, ToBase32, Variant};
-
-// use base64::encode;
-// use cosmwasm_crypto::secp256k1_verify;
-
+use sha2::{Digest, Sha256};
 
 pub const NATIVE_DENOM: &str = "uheart";
 
@@ -46,8 +42,8 @@ pub fn execute(
     match msg {
         ExecuteMsg::AllowProvider { provider_id } => allow_provider(deps, env, info, provider_id),
         ExecuteMsg::RegisterProvider { name, price, expires, execution_limit, supported_nfts, endpoint } => register_provider(deps, env, info, name, price, expires, execution_limit, supported_nfts, endpoint),
-        ExecuteMsg::ExecuteAlgorithm { msg, pubkey} => execute_algorithm(deps, env, info, msg, pubkey),
-        ExecuteMsg::UpdateWorkloadStatus { workload_id, pubkey } =>  update_workload_status(deps, env, info, workload_id, pubkey),
+        ExecuteMsg::ExecuteAlgorithm { msg } => execute_algorithm(deps, env, info, msg),
+        ExecuteMsg::UpdateWorkloadStatus { msg, signature, pubkey } =>  update_workload_status(deps, info, msg, signature, pubkey),
     }
 }
 
@@ -61,7 +57,7 @@ pub fn allow_provider(
     
     if info.sender.ne(&admin) {
         return Err(ContractError::Unauthorized {  });
-    } 
+    }
 
     let mut provider = PROVIDER_INFO.load(deps.storage, provider_id.to_string())?;
     provider.is_allowed = true;
@@ -115,13 +111,9 @@ pub fn execute_algorithm(
     env: Env,
     info: MessageInfo,
     msg: ExecuteAIMsgDetail,
-    pubkey: Binary,
-) -> Result<Response, ContractError> {
-    let addr = pubkey_to_address(&pubkey)?;
+    // signature_hash: String,
+) -> Result<Response, ContractError> { 
 
-    if addr.ne(&info.sender) {
-        return Err(ContractError::Unauthorized {});
-    }
 
     let provider_id = msg.provider_id;
     let nft_addr = msg.nft_addr;
@@ -167,7 +159,7 @@ pub fn execute_algorithm(
 
     // pay creator for the usage
     let mut res = Response::new();
-    payout(deps.as_ref(), provider_info.price, provider_info.register, &mut res)?;
+    payout(deps.as_ref(), provider_info.price, provider_info.register.clone(), &mut res)?;
     
     // Get docker url from AI NFT
     let nft_info: NftInfoResponse<Metadata> = deps.querier.query_wasm_smart(nft_addr, &Cw721QueryMsg::<Empty>::NftInfo { token_id })?;
@@ -177,13 +169,16 @@ pub fn execute_algorithm(
 
     let workload_info = WorkloadInfo {
         provider_id,
-        executor: info.sender,
+        executor: provider_info.register,
         time: env.block.time,
         status: WorkloadStatus::Running,
         docker_img_url: docker_img_url.clone(),
+        caller: info.sender.to_string(),
     };
 
     WORKLOAD_INFO.save(deps.storage, workload_id.to_string(), &workload_info)?;
+
+    res = res.add_attribute("workload_id", workload_id);
 
     workload_id += Uint128::from(1 as u32);
     WORKLOAD_COUNT.save(deps.storage, &workload_id)?;
@@ -191,41 +186,20 @@ pub fn execute_algorithm(
     Ok(
         res.add_attribute("endpoint", provider_info.endpoint)
             .add_attribute("docker_img_url", docker_img_url)
-            .add_attribute("workload_id", workload_id)
     )
 }
 
 pub fn update_workload_status(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    workload_id: Uint128,
-    pubkey: Binary,
-    // sig_msg: Binary,
-    // signature_hash: Binary,
+    _info: MessageInfo,
+    msg: String, 
+    signature_hash: String, 
+    pubkey_base64: String,
 ) -> Result<Response, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
+    // let input_msg: InputMsg = from_binary(&Binary::from_base64(&msg)?)?;
 
-    if info.sender != admin {
-        return  Err(ContractError::Unauthorized { });
-    }
-
-    let workload_info = query_is_authorized_executor(deps.as_ref(), env, pubkey, workload_id)?;
-    if workload_info.is_none() {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    let mut workload = workload_info.unwrap();
-
-    if workload.status != WorkloadStatus::Running {
-        return Err(ContractError::NotRunningWorkload { });
-    }
-
-    // let pubkey = workload.clone().executor;
-    // let is_signed = secp256k1_verify(sig_msg.as_slice(), signature_hash.as_slice(),  pubkey.as_slice()).unwrap();
-    // if !is_signed {
-    //     return  Err(ContractError::Unauthorized { });
-    // }
+    let workload_id: Uint128 = msg.parse().unwrap();
+    let mut workload = query_authorized_workload(deps.as_ref(), msg.clone(), signature_hash, pubkey_base64)?;
 
     workload.status = WorkloadStatus::Completed;
     WORKLOAD_INFO.save(deps.storage, workload_id.to_string(), &workload)?;
@@ -237,9 +211,10 @@ pub fn update_workload_status(
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetProviderById { id } => to_binary(&query_provider_by_id(deps, env, id)?),
-        QueryMsg::GetWorkloadStatus { workload_id } => to_binary(&query_workload_info_by_id(deps, env, workload_id)?),
+        QueryMsg::GetWorkloadStatus { workload_id } => to_binary(&query_workload_info_by_id(deps, workload_id)?),
         QueryMsg::GetProviderCount {} => to_binary(&query_provider_count(deps, env)?),
-        QueryMsg::GetAllowedWorkload { pubkey, workload_id } => to_binary(&query_is_authorized_executor(deps, env, pubkey, workload_id)?),
+        QueryMsg::GetAllowedWorkload { pubkey, workload_id } => to_binary(&query_is_authorized_executor(deps, pubkey, workload_id)?),
+        QueryMsg::GetAuthorizedWorkload {msg, signature_hash, pubkey_base64} => to_binary(&query_authorized_workload(deps, msg, signature_hash, pubkey_base64)?),
     }
 }
 
@@ -248,8 +223,59 @@ fn query_provider_by_id(deps: Deps, _env: Env, id: Uint128) -> StdResult<Provide
     Ok(ProviderResponse {provider})
 }
 
-fn query_workload_info_by_id(deps: Deps, _env: Env, workload_id: Uint128) -> StdResult<WorkloadInfoResponse> {
+fn query_authorized_workload(
+    deps: Deps, 
+    msg: String, 
+    signature_hash: String,
+    pubkey_base64: String
+) -> StdResult<WorkloadInfo> {
+    let workload_id: Uint128 = msg.parse().unwrap();
+    let workload_info = query_workload_info_by_id(deps, workload_id)?;
+
+    if workload_info.workload.is_none() {
+        return Err(StdError::generic_err(
+                    "No such workload",
+                ));
+    }
+
+    let workload = workload_info.workload.unwrap();
+
+    let pubkey = Binary::from_base64(&pubkey_base64)?;
+    let addr = pubkey_to_address(&pubkey).unwrap();
+
+    if addr.ne(&workload.caller) {
+        return Err(StdError::generic_err(
+            "Verification failed. Caller is not authorized",
+        ));
+    }
+
+    let mut msg_adr36:Vec<u8> = vec![123,34,97,99,99,111,117,110,116,95,110,117,109,98,101,114,34,58,34,48,34,44,34,99,104,97,105,110,95,105,100,34,58,34,34,44,34,102,101,101,34,58,123,34,97,109,111,117,110,116,34,58,91,93,44,34,103,97,115,34,58,34,48,34,125,44,34,109,101,109,111,34,58,34,34,44,34,109,115,103,115,34,58,91,123,34,116,121,112,101,34,58,34,115,105,103,110,47,77,115,103,83,105,103,110,68,97,116,97,34,44,34,118,97,108,117,101,34,58,123,34,100,97,116,97,34,58,34];
+    msg_adr36.append(&mut base64::encode(msg).as_bytes().to_vec());
+    msg_adr36.append(&mut vec![34,44,34,115,105,103,110,101,114,34,58,34]);
+    msg_adr36.append(&mut addr.clone().as_bytes().to_vec());
+    msg_adr36.append(&mut vec![34,125,125,93,44,34,115,101,113,117,101,110,99,101,34,58,34,48,34,125]);
+
+    let hash = Sha256::digest(&msg_adr36);
+
+    let signature = Binary::from_base64(&signature_hash)?;
+    let pubkey = Binary::from_base64(&pubkey_base64)?;
+
+    let is_verified = deps.api.secp256k1_verify(hash.as_ref(), signature.as_slice(), pubkey.as_slice()).unwrap();
+    if !is_verified {
+        return Err(StdError::generic_err(
+            "Verification failed.",
+        ));
+    }
+
+    Ok(workload)
+}
+
+fn query_workload_info_by_id(
+    deps: Deps, 
+    workload_id: Uint128, 
+) -> StdResult<WorkloadInfoResponse> {
     let workload = WORKLOAD_INFO.may_load(deps.storage, workload_id.to_string())?;
+
     Ok(WorkloadInfoResponse { workload })
 }
 
@@ -258,7 +284,7 @@ fn query_provider_count(deps: Deps, _env: Env) -> StdResult<Uint128> {
     Ok(provider_count)
 }
 
-fn query_is_authorized_executor(deps: Deps, _env: Env, pubkey: Binary, workload_id: Uint128) -> StdResult<Option<WorkloadInfo>> {
+fn query_is_authorized_executor(deps: Deps, pubkey: Binary, workload_id: Uint128) -> StdResult<Option<WorkloadInfo>> {
     let addr = pubkey_to_address(&pubkey).unwrap();
     let workload_info = WORKLOAD_INFO.load(deps.storage, workload_id.to_string())?;
 

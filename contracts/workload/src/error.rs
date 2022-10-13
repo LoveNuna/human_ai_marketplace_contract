@@ -30,6 +30,9 @@ pub enum ContractError {
     #[error("There is no such a provider")]
     NoSuchProvider {},
 
+    #[error("There is no such a workload")]
+    NoSuchWorkload {},
+
     #[error("Wrong payment")]
     WrongPayment {},
 

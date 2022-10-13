@@ -19,19 +19,30 @@ pub struct ExecuteAIMsgDetail {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+pub struct InputMsg {
+    pub input: String, 
+    pub workload_id: Uint128, 
+}
+
+// impl fmt::Display for InputMsg {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         write!(f, "input: {}, workload_id: {})", self.input, self.workload_id)
+//     }
+// }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     // AddWhitelistedRegister { whitelisted_register: String},
     AllowProvider { provider_id: Uint128 },
     RegisterProvider { name: String, price: Uint128, expires: u64, execution_limit: Uint128, supported_nfts: Vec<String>, endpoint: String },
     ExecuteAlgorithm { 
         msg: ExecuteAIMsgDetail,
-        pubkey: Binary,
     },
-    UpdateWorkloadStatus { 
-        workload_id: Uint128,
-        pubkey: Binary,
-        // sig_msg: Binary, 
-        // signature_hash: Binary,
+    UpdateWorkloadStatus {
+        msg: String,
+        signature: String,
+        pubkey: String,
      },
 }
 
@@ -42,7 +53,8 @@ pub enum QueryMsg {
     GetProviderById { id: Uint128 },
     GetWorkloadStatus { workload_id: Uint128 },
     GetProviderCount {},
-    GetAllowedWorkload { pubkey: Binary, workload_id: Uint128 }
+    GetAllowedWorkload { pubkey: Binary, workload_id: Uint128 },
+    GetAuthorizedWorkload { msg: String, signature_hash: String, pubkey_base64: String},
 }
 
 // We define a custom struct for each query response

@@ -40,10 +40,11 @@ cw721-base = { path = "../cw721-base" }
 sha2 = "0.10.6"
 base64 = "0.12.3"
 bincode = "1.3.3"
-cosmwasm-crypto = "1.1.2"
+
 ripemd = "0.1.3"
 bech32 = "0.9.1"
-getrandom = { version = "0.2", features = ["js"] }
+tiny-keccak = { version = "2.0.1", features = ["sha3", "keccak"] }
+digest = "0.10"
 
 [dev-dependencies]
 cosmwasm-schema = { version = "1.0.0-beta" }
